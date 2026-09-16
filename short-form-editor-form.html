@@ -1,0 +1,1293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Short Form Editor application</title>
+<meta name="description" content="Apply to work with us as a short form video editor.">
+<meta name="theme-color" content="#121212">
+<!-- Remove the next line if you want search engines to index this page -->
+<meta name="robots" content="noindex, nofollow">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --bg: #121212;
+    --card: rgba(26, 26, 26, 0.94);
+    --card-border: #2a2a2a;
+    --field: #1e1e1e;
+    --field-border: #353535;
+    --field-hover: #4a4a4a;
+    --text: #f5f5f3;
+    --muted: #9b9b98;
+    --accent: #ffde59;
+    --accent-ink: #121212;
+    --accent-soft: rgba(255, 222, 89, 0.12);
+    --accent-glow: rgba(255, 222, 89, 0.35);
+    --red: #ff5a4e;
+    --red-glow: rgba(255, 90, 78, 0.45);
+    --ease: cubic-bezier(0.22, 1, 0.36, 1);
+    --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --font: "Montserrat", system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 15px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(60% 45% at 50% 0%, rgba(255, 222, 89, 0.11), transparent 70%),
+      radial-gradient(45% 30% at 50% 100%, rgba(255, 222, 89, 0.04), transparent 70%);
+  }
+
+  #confetti {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 50;
+  }
+
+  .app {
+    position: relative;
+    z-index: 1;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    animation: rise 0.7s var(--ease) both;
+  }
+
+  /* Progress dashes */
+  .progress {
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    padding: 28px 20px 0;
+    transition: opacity 0.4s;
+  }
+  .progress i {
+    display: block;
+    height: 4px;
+    width: 16px;
+    border-radius: 2px;
+    background: #333;
+    transition: width 0.4s var(--ease), background 0.4s, opacity 0.4s;
+  }
+  .progress i.done { background: var(--accent); opacity: 0.6; }
+  .progress i.current { background: var(--accent); width: 30px; opacity: 1; }
+  .progress.hide { opacity: 0; }
+
+  .main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 28px 20px 60px;
+  }
+
+  .title {
+    margin: 0 0 22px;
+    font-size: clamp(26px, 4vw, 36px);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    text-align: center;
+    min-height: 1.2em;
+    transition: opacity 0.18s, transform 0.18s;
+  }
+  .title.t-out { opacity: 0; transform: translateY(-6px); }
+  .title.hide { display: none; }
+
+  .card {
+    width: 100%;
+    max-width: 560px;
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 24px;
+    box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.02) inset;
+    padding: clamp(24px, 5vw, 40px);
+    transition: height 0.38s var(--ease), max-width 0.45s var(--ease);
+  }
+  .card.animating { overflow: hidden; }
+  .card.success-card { max-width: 400px; }
+
+  /* Stage transitions */
+  .stage.in-fwd { animation: inFwd 0.42s var(--ease) both; }
+  .stage.in-back { animation: inBack 0.42s var(--ease) both; }
+  .stage.out-fwd { animation: outFwd 0.17s ease-in both; }
+  .stage.out-back { animation: outBack 0.17s ease-in both; }
+  @keyframes inFwd { from { opacity: 0; transform: translateX(32px); } to { opacity: 1; transform: none; } }
+  @keyframes inBack { from { opacity: 0; transform: translateX(-32px); } to { opacity: 1; transform: none; } }
+  @keyframes outFwd { to { opacity: 0; transform: translateX(-22px); } }
+  @keyframes outBack { to { opacity: 0; transform: translateX(22px); } }
+  @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+  @keyframes pop { from { transform: scale(0.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-5px); }
+    75% { transform: translateX(5px); }
+  }
+  @keyframes redPulse {
+    0%, 100% { box-shadow: 0 0 10px var(--red-glow); }
+    50% { box-shadow: 0 0 26px var(--red-glow); }
+  }
+
+  /* Question text and labels */
+  .q, .sublabel {
+    margin: 0 0 12px;
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1.45;
+  }
+  .sublabel { margin-top: 22px; }
+  .req { color: var(--accent); font-weight: 700; }
+  .gate-text {
+    margin: 4px 0 8px;
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.6;
+  }
+
+  .field { margin-bottom: 18px; }
+  .field:last-child { margin-bottom: 0; }
+  .label-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 8px;
+  }
+  .label-row label { font-size: 13px; font-weight: 700; }
+  .hint {
+    flex: none;
+    white-space: nowrap;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--accent);
+    opacity: 0;
+    transform: translateY(2px);
+    transition: opacity 0.2s, transform 0.2s;
+  }
+  .hint.show { opacity: 1; transform: none; }
+  .field.invalid .hint { color: var(--red); }
+  .helper {
+    margin: -4px 0 10px;
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+
+  input[type="text"], input[type="email"], input[type="tel"], input[type="url"], input[type="number"], textarea {
+    width: 100%;
+    background: var(--field);
+    color: var(--text);
+    border: 1px solid var(--field-border);
+    border-radius: 12px;
+    padding: 13px 14px;
+    font: inherit;
+    font-size: 14px;
+    transition: border-color 0.2s, box-shadow 0.25s, background 0.2s;
+  }
+  input::placeholder, textarea::placeholder { color: #6b6b68; }
+  input:hover, textarea:hover { border-color: var(--field-hover); }
+  input:focus, textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft), 0 0 22px rgba(255, 222, 89, 0.12);
+  }
+  textarea { min-height: 112px; resize: vertical; }
+  input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
+  input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .field.invalid input, .field.invalid textarea, .field.invalid .affix { border-color: var(--red); }
+
+  /* Prefix and suffix input */
+  .affix {
+    display: flex;
+    align-items: center;
+    background: var(--field);
+    border: 1px solid var(--field-border);
+    border-radius: 12px;
+    padding: 0 14px;
+    transition: border-color 0.2s, box-shadow 0.25s;
+  }
+  .affix:hover { border-color: var(--field-hover); }
+  .affix:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft), 0 0 22px rgba(255, 222, 89, 0.12);
+  }
+  .affix input {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    background: transparent;
+    padding: 13px 8px;
+    box-shadow: none;
+  }
+  .affix input:focus { box-shadow: none; border: 0; }
+  .affix .pre, .affix .suf { color: var(--muted); font-size: 13px; font-weight: 600; }
+
+  /* Choice rows */
+  .choices { display: grid; gap: 10px; }
+  .choice {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 13px 16px;
+    background: var(--field);
+    border: 1px solid var(--field-border);
+    border-radius: 12px;
+    color: var(--text);
+    font: inherit;
+    font-size: 14px;
+    font-weight: 500;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.22s, border-color 0.22s, transform 0.25s var(--ease);
+  }
+  .choice:hover { border-color: var(--field-hover); }
+  .choice:active { transform: scale(0.985); }
+  .choice .ctext { flex: 1; }
+  .choice .mark {
+    width: 20px;
+    height: 20px;
+    flex: none;
+    border-radius: 50%;
+    border: 2px solid #555;
+    display: grid;
+    place-items: center;
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .choice.box .mark { border-radius: 6px; }
+  .choice .mark svg {
+    width: 11px;
+    height: 11px;
+    stroke: var(--accent-ink);
+    transform: scale(0);
+    transition: transform 0.28s var(--spring);
+  }
+  .choice[aria-checked="true"] { background: var(--accent-soft); border-color: var(--accent); }
+  .choice[aria-checked="true"] .mark { background: var(--accent); border-color: var(--accent); }
+  .choice[aria-checked="true"] .mark svg { transform: scale(1); }
+  .choice.row-new { animation: rise 0.4s var(--ease) both; }
+  .choices.invalid .choice { border-color: var(--red); }
+
+  .lang-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 520px) { .lang-grid { grid-template-columns: 1fr; } }
+  .flag { font-size: 20px; line-height: 1; width: 24px; text-align: center; flex: none; }
+  img.flag { width: 24px; height: 17px; object-fit: cover; border-radius: 3px; }
+
+  /* Reveal blocks */
+  .reveal {
+    display: grid;
+    grid-template-rows: 0fr;
+    opacity: 0;
+    margin-top: 0;
+    transition: grid-template-rows 0.38s var(--ease), opacity 0.3s, margin 0.38s var(--ease);
+  }
+  .reveal > div { overflow: hidden; min-height: 0; }
+  .reveal.open { grid-template-rows: 1fr; opacity: 1; margin-top: 18px; }
+  .reveal.open.settled > div { overflow: visible; }
+  .reveal.tight.open { margin-top: 10px; }
+
+  /* Add custom row */
+  .add-row { position: relative; }
+  .add-row input { padding-right: 54px; }
+  .btn-plus {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 0;
+    background: var(--accent);
+    color: var(--accent-ink);
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    transition: transform 0.25s var(--spring), box-shadow 0.2s;
+  }
+  .btn-plus svg { width: 15px; height: 15px; stroke: var(--accent-ink); }
+  .btn-plus:hover { transform: translateY(-50%) scale(1.1); box-shadow: 0 0 14px var(--accent-glow); }
+  .add-row.flash input { border-color: var(--red); animation: shake 0.35s; box-shadow: 0 0 0 3px rgba(255, 90, 78, 0.18); }
+
+  /* Slider */
+  .slider { position: relative; height: 28px; margin: 12px 0 2px; }
+  .slider .track {
+    position: absolute;
+    left: 0; right: 0; top: 50%;
+    height: 14px;
+    transform: translateY(-50%);
+    background: #262626;
+    border-radius: 7px;
+    overflow: hidden;
+  }
+  .slider .fill {
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 14px;
+    background: var(--accent);
+    border-radius: 7px;
+    transition: width 0.09s linear;
+  }
+  .slider .dots {
+    position: absolute;
+    left: 14px; right: 14px; top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    justify-content: space-between;
+    pointer-events: none;
+  }
+  .slider .dots i { width: 4px; height: 4px; border-radius: 50%; background: rgba(120, 120, 120, 0.7); }
+  .slider input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 28px;
+    margin: 0;
+    opacity: 0;
+    cursor: pointer;
+    -webkit-appearance: none;
+    appearance: none;
+    background: transparent;
+    z-index: 2;
+  }
+  .slider input::-webkit-slider-thumb { -webkit-appearance: none; width: 28px; height: 28px; }
+  .slider input::-moz-range-thumb { width: 28px; height: 28px; border: 0; }
+  .slider .knob {
+    position: absolute;
+    top: 0; left: 0;
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: #fff;
+    color: #121212;
+    font-size: 11px;
+    font-weight: 700;
+    display: grid;
+    place-items: center;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.55);
+    pointer-events: none;
+    z-index: 1;
+    transition: transform 0.25s var(--spring), left 0.09s linear;
+  }
+  .slider.active .knob { transform: scale(1.18); }
+  .slider input:focus-visible ~ .knob { outline: 2px solid var(--accent); outline-offset: 3px; }
+  .slider-ends { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+  /* Video */
+  .video {
+    position: relative;
+    display: block;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    border-radius: 14px;
+    overflow: hidden;
+    border: 1px solid var(--field-border);
+    background: #000 center / cover no-repeat;
+    cursor: pointer;
+    padding: 0;
+  }
+  .video iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+  .video .play {
+    position: absolute;
+    left: 50%; top: 50%;
+    width: 60px; height: 60px;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    background: var(--accent);
+    display: grid;
+    place-items: center;
+    box-shadow: 0 0 30px var(--accent-glow);
+    transition: transform 0.28s var(--spring), box-shadow 0.2s;
+  }
+  .video .play svg { width: 26px; height: 26px; color: var(--accent-ink); margin-left: 3px; }
+  .video:hover .play { transform: translate(-50%, -50%) scale(1.1); box-shadow: 0 0 44px var(--accent-glow); }
+  .video.placeholder {
+    display: grid;
+    place-items: center;
+    border-style: dashed;
+    color: var(--muted);
+    font-size: 13px;
+    text-align: center;
+    padding: 20px;
+    cursor: default;
+  }
+
+  /* Nav */
+  .nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-top: 28px;
+  }
+  .btn-back {
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    background: #262626;
+    border: 1px solid #333;
+    color: var(--text);
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.25s var(--ease), border-color 0.2s;
+  }
+  .btn-back svg { width: 18px; height: 18px; stroke: currentColor; }
+  .btn-back:hover { background: #2f2f2f; border-color: #444; transform: translateX(-2px); }
+  .btn-back[disabled] { opacity: 0.3; cursor: default; transform: none; }
+
+  .btn-next {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    padding: 6px 6px 6px 22px;
+    border-radius: 999px;
+    border: 0;
+    background: var(--accent);
+    color: var(--accent-ink);
+    font: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.25s var(--ease), box-shadow 0.25s, opacity 0.2s;
+  }
+  .btn-next .circ {
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    background: var(--accent-ink);
+    display: grid;
+    place-items: center;
+    transition: transform 0.28s var(--ease);
+  }
+  .btn-next .circ svg { width: 16px; height: 16px; stroke: var(--accent); }
+  .btn-next:hover { transform: translateY(-1px); box-shadow: 0 10px 26px var(--accent-glow); }
+  .btn-next:hover .circ { transform: translateX(3px); }
+  .btn-next.submit { box-shadow: 0 0 28px var(--accent-glow); }
+  .btn-next[disabled] { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+  .btn-next[disabled] .circ { transform: none; }
+
+  /* Gate button */
+  .btn-gate {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    padding: 6px 6px 6px 16px;
+    border-radius: 999px;
+    background: transparent;
+    border: 1.5px solid var(--red);
+    color: var(--text);
+    font: inherit;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    animation: redPulse 1.8s ease-in-out infinite;
+    transition: border-color 0.3s, box-shadow 0.3s, transform 0.3s var(--spring);
+  }
+  .btn-gate .box {
+    width: 18px; height: 18px;
+    border-radius: 5px;
+    border: 2px solid var(--red);
+    display: grid;
+    place-items: center;
+    transition: background 0.2s, border-color 0.2s;
+  }
+  .btn-gate .box svg { width: 10px; height: 10px; stroke: var(--accent-ink); transform: scale(0); transition: transform 0.28s var(--spring); }
+  .btn-gate .circ {
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    background: #2a2a2a;
+    display: grid;
+    place-items: center;
+    transition: background 0.3s, transform 0.28s var(--ease);
+  }
+  .btn-gate .circ svg { width: 16px; height: 16px; stroke: var(--muted); transition: stroke 0.3s; }
+  .btn-gate.ok {
+    border-color: var(--accent);
+    animation: none;
+    box-shadow: 0 0 22px var(--accent-glow);
+  }
+  .btn-gate.ok .box { background: var(--accent); border-color: var(--accent); }
+  .btn-gate.ok .box svg { transform: scale(1); }
+  .btn-gate.ok .circ { background: var(--accent); }
+  .btn-gate.ok .circ svg { stroke: var(--accent-ink); }
+  .btn-gate.ok:hover .circ { transform: translateX(3px); }
+  .btn-gate.ok.popped { transform: scale(1.04); }
+
+  /* Review */
+  .rcard {
+    background: #1f1f1f;
+    border: 1px solid #2c2c2c;
+    border-radius: 16px;
+    padding: 16px 18px 18px;
+    margin-bottom: 14px;
+    animation: rise 0.5s var(--ease) both;
+    animation-delay: calc(var(--i) * 70ms);
+  }
+  .rhead {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #2c2c2c;
+  }
+  .rhead .rt { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 14px; }
+  .rhead .dot { width: 18px; height: 18px; border-radius: 50%; background: var(--accent); display: grid; place-items: center; flex: none; }
+  .rhead .dot svg { width: 10px; height: 10px; stroke: var(--accent-ink); }
+  .btn-edit {
+    background: none;
+    border: 0;
+    color: var(--text);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    opacity: 0.85;
+    padding: 4px 6px;
+    border-radius: 8px;
+    transition: opacity 0.2s, background 0.2s;
+  }
+  .btn-edit svg { width: 13px; height: 13px; stroke: var(--accent); }
+  .btn-edit:hover { opacity: 1; background: rgba(255, 255, 255, 0.05); }
+  .rrow { margin-top: 12px; }
+  .rq { margin: 0 0 3px; font-size: 12px; color: var(--muted); line-height: 1.4; }
+  .ra { margin: 0; font-size: 14px; font-weight: 500; word-break: break-word; white-space: pre-wrap; }
+  .ts { display: flex; justify-content: center; margin-top: 6px; }
+  .ts.hide { display: none; }
+  .err-msg { margin: 12px 0 0; font-size: 13px; color: var(--red); text-align: right; min-height: 1.2em; }
+
+  /* Success */
+  .success { text-align: center; padding: 6px 0; }
+  .success .check {
+    width: 60px; height: 60px;
+    margin: 0 auto 18px;
+    border-radius: 50%;
+    background: var(--accent);
+    display: grid;
+    place-items: center;
+    box-shadow: 0 0 34px var(--accent-glow);
+    animation: pop 0.6s var(--spring) both;
+  }
+  .success .check svg { width: 26px; height: 26px; stroke: var(--accent-ink); }
+  .success h2 {
+    margin: 0 0 8px;
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    animation: rise 0.5s 0.15s var(--ease) both;
+  }
+  .success p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1.6;
+    animation: rise 0.5s 0.28s var(--ease) both;
+  }
+
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  input:focus-visible, textarea:focus-visible { outline: none; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+    .btn-gate { animation: none; box-shadow: 0 0 14px var(--red-glow); }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="confetti" aria-hidden="true"></canvas>
+
+<div class="app">
+  <div class="progress" id="progress" aria-hidden="true"></div>
+  <main class="main">
+    <h1 class="title" id="title"></h1>
+    <section class="card" id="card" aria-live="polite">
+      <div class="stage" id="stage"></div>
+    </section>
+  </main>
+</div>
+
+<script>
+/* ============================================================
+   CONFIG. Edit this block and nothing else needs touching.
+   ============================================================ */
+var CONFIG = {
+  brandName: "YOUR BRAND",
+
+  // Where applications get sent. A URL that accepts a JSON POST.
+  // Formspree example: "https://formspree.io/f/abcdwxyz"
+  // Leave empty to test the flow. The payload is logged to the console.
+  submitEndpoint: "",
+
+  // Cloudflare Turnstile site key. Leave empty to hide the bot check.
+  turnstileSiteKey: "",
+
+  // The YouTube video ID of the reference clip. Just the ID, not the full URL.
+  // For https://www.youtube.com/watch?v=dQw4w9WgXcQ the ID is dQw4w9WgXcQ
+  youtubeVideoId: "",
+
+  contactEmail: "hello@yourdomain.com",
+
+  successNote: "Every application gets read by a real person. You'll hear back either way.",
+
+  // flag can be an emoji or an image URL
+  languages: [
+    { code: "en", label: "English", flag: "\uD83C\uDDFA\uD83C\uDDF8" },
+    { code: "ru", label: "Russian", flag: "\uD83C\uDDF7\uD83C\uDDFA" }
+  ],
+
+  software: ["After Effects", "Premiere Pro", "CapCut", "DaVinci Resolve"]
+};
+
+(function () {
+  "use strict";
+
+  var KEY = "sfe-application-draft-v1";
+  var REVIEW = 8;
+  var motion = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  var defaults = {
+    language: "", hasExample: "", understood: false, exampleLink: "",
+    name: "", phone: "", email: "", telegram: "", discord: "", englishLevel: null,
+    software: [], customSoftware: [],
+    automateSubs: "", subsProcess: "",
+    pricePerReel: "", deliveryHours: "", referral: ""
+  };
+  var state = { screen: 0, editing: 0, answers: JSON.parse(JSON.stringify(defaults)), token: "" };
+
+  function $(s, r) { return (r || document).querySelector(s); }
+  function $$(s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); }
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+
+  var stage = $("#stage"), title = $("#title"), card = $("#card"), progress = $("#progress");
+
+  var ICON = {
+    check: '<svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L19 7"/></svg>',
+    arrow: '<svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>',
+    back: '<svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>',
+    plus: '<svg viewBox="0 0 24 24" fill="none" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+    pencil: '<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg>',
+    play: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>'
+  };
+
+  /* ---------- storage ---------- */
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify({ screen: state.screen, answers: state.answers })); } catch (e) {}
+  }
+  function load() {
+    try {
+      var raw = localStorage.getItem(KEY);
+      if (!raw) return;
+      var d = JSON.parse(raw);
+      if (d && d.answers) {
+        for (var k in defaults) if (k in d.answers) state.answers[k] = d.answers[k];
+      }
+      if (typeof d.screen === "number" && d.screen >= 0 && d.screen <= REVIEW) state.screen = d.screen;
+    } catch (e) {}
+  }
+
+  /* ---------- small templates ---------- */
+  function nav(o) {
+    o = o || {};
+    var right = o.right || (
+      '<button type="button" class="btn-next ' + (o.cls || "") + '" data-act="next"' + (o.disabled ? " disabled" : "") + '>' +
+      '<span class="lbl">' + (o.label || "Continue") + '</span><span class="circ">' + ICON.arrow + '</span></button>'
+    );
+    return '<div class="nav"><button type="button" class="btn-back" data-act="back"' + (o.backDisabled ? " disabled" : "") +
+      ' aria-label="Back">' + ICON.back + '</button>' + right + '</div>';
+  }
+
+  function field(o) {
+    return '<div class="field" data-field="' + o.id + '">' +
+      '<div class="label-row"><label for="' + o.id + '">' + o.label + (o.required ? ' <span class="req">*</span>' : "") + '</label>' +
+      '<span class="hint" data-hint></span></div>' +
+      (o.helper ? '<p class="helper">' + o.helper + '</p>' : "") +
+      o.input + '</div>';
+  }
+
+  function textInput(id, ph, type, extra) {
+    return '<input id="' + id + '" name="' + id + '" type="' + (type || "text") + '" value="' + esc(state.answers[id]) +
+      '" placeholder="' + esc(ph || "") + '" ' + (extra || "") + '>';
+  }
+
+  function choice(o) {
+    var mark = '<span class="mark">' + ICON.check + '</span>';
+    return '<button type="button" class="choice' + (o.type === "checkbox" ? " box" : "") + (o.extraClass ? " " + o.extraClass : "") +
+      '" role="' + o.type + '" aria-checked="' + (o.checked ? "true" : "false") + '" data-name="' + o.name + '" data-value="' + esc(o.value) + '">' +
+      (o.markRight ? "" : mark) + (o.pre || "") + '<span class="ctext">' + esc(o.label) + '</span>' + (o.markRight ? mark : "") +
+      '</button>';
+  }
+
+  function radioGroup(name, options) {
+    return '<div class="choices" role="radiogroup" data-group="' + name + '">' + options.map(function (op) {
+      return choice({ type: "radio", name: name, value: op.value, label: op.label, checked: state.answers[name] === op.value });
+    }).join("") + '</div>';
+  }
+
+  function videoHTML() {
+    var id = CONFIG.youtubeVideoId;
+    if (!id) return '<div class="video placeholder"><span>Reference video goes here.<br>Set youtubeVideoId in CONFIG.</span></div>';
+    return '<button type="button" class="video" data-act="play" aria-label="Play the reference video" style="background-image:url(https://img.youtube.com/vi/' + esc(id) + '/hqdefault.jpg)">' +
+      '<span class="play">' + ICON.play + '</span></button>';
+  }
+
+  function stackListHTML(newLabel) {
+    var a = state.answers;
+    var rows = CONFIG.software.map(function (s) {
+      return choice({ type: "checkbox", name: "software", value: s, label: s, checked: a.software.indexOf(s) > -1 });
+    });
+    rows.push(choice({ type: "checkbox", name: "software", value: "Other", label: "Other", checked: a.software.indexOf("Other") > -1 }));
+    a.customSoftware.forEach(function (s) {
+      rows.push(choice({ type: "checkbox", name: "software", value: s, label: s, checked: a.software.indexOf(s) > -1, extraClass: s === newLabel ? "row-new" : "" }));
+    });
+    return rows.join("");
+  }
+
+  /* ---------- screens ---------- */
+  var SCREENS = [
+    { id: "lang", step: 1, title: "Start here",
+      render: function () {
+        return '<p class="q">Choose the language you will use in this application <span class="req">*</span></p>' +
+          '<div class="lang-grid choices" role="radiogroup" data-group="language">' + CONFIG.languages.map(function (l) {
+            var flag = /^(https?:|data:)/.test(l.flag) ? '<img class="flag" src="' + esc(l.flag) + '" alt="">' : '<span class="flag" aria-hidden="true">' + esc(l.flag) + '</span>';
+            return choice({ type: "radio", name: "language", value: l.code, label: l.label, checked: state.answers.language === l.code, pre: flag, markRight: true });
+          }).join("") + '</div>' + nav({ backDisabled: true });
+      },
+      validate: function () { return groupValid("language", state.answers.language !== ""); }
+    },
+
+    { id: "example", step: 2, title: "Your work",
+      render: function () {
+        return '<p class="q">Do you have one example of your work with motion graphics and captions? <span class="req">*</span></p>' +
+          radioGroup("hasExample", [{ value: "yes", label: "Yes" }, { value: "no", label: "No, I want to do a sample edit" }]) +
+          '<p class="sublabel">Ideal short form video reference</p>' + videoHTML() + nav();
+      },
+      validate: function () { return groupValid("hasExample", state.answers.hasExample !== ""); }
+    },
+
+    { id: "gate", step: 2, title: "Your work",
+      render: function () {
+        var ok = state.answers.understood;
+        return '<p class="gate-text">One link. That\u2019s it. Sending more than one link, or a full portfolio, is an automatic disqualification. Show us the single piece you\u2019d put in front of a client.</p>' +
+          nav({ right: '<button type="button" class="btn-gate' + (ok ? " ok" : "") + '" data-act="gate" aria-pressed="' + (ok ? "true" : "false") + '">' +
+            '<span class="box">' + ICON.check + '</span><span>I understand</span><span class="circ">' + ICON.arrow + '</span></button>' });
+      },
+      validate: function () { return !!state.answers.understood; }
+    },
+
+    { id: "link", step: 2, title: "Your work",
+      render: function () {
+        return field({ id: "exampleLink", label: "Paste the link to the one example closest to the reference video", required: true,
+          input: textInput("exampleLink", "https://", "url", 'autocomplete="url" spellcheck="false"') }) + nav();
+      },
+      validate: function () {
+        var v = state.answers.exampleLink.trim();
+        return fieldValid("exampleLink", /^https?:\/\/\S+/i.test(v), v ? "Needs to start with https://" : "Required");
+      }
+    },
+
+    { id: "about", step: 3, title: "About you",
+      render: function () {
+        var lvl = state.answers.englishLevel;
+        var dots = ""; for (var i = 0; i <= 10; i++) dots += "<i></i>";
+        return field({ id: "name", label: "Name", required: true, input: textInput("name", "Your name", "text", 'autocomplete="name"') }) +
+          field({ id: "phone", label: "Phone number", required: true, input: textInput("phone", "+1 305 555 0123", "tel", 'autocomplete="tel" inputmode="tel"') }) +
+          field({ id: "email", label: "Email", required: true, input: textInput("email", "you@example.com", "email", 'autocomplete="email" inputmode="email"') }) +
+          field({ id: "telegram", label: "Telegram username", input: textInput("telegram", "@username", "text", 'autocomplete="off" spellcheck="false"') }) +
+          field({ id: "discord", label: "Discord username", input: textInput("discord", "username", "text", 'autocomplete="off" spellcheck="false"') }) +
+          '<div class="field" data-field="englishLevel"><div class="label-row"><label for="englishLevel">How well do you understand spoken English? <span class="req">*</span></label><span class="hint" data-hint></span></div>' +
+          '<div class="slider' + (lvl === null ? " untouched" : "") + '" id="slider">' +
+          '<div class="track"><div class="fill" id="sliderFill"></div><div class="dots">' + dots + '</div></div>' +
+          '<input type="range" id="englishLevel" min="0" max="10" step="1" value="' + (lvl === null ? 0 : lvl) + '" aria-valuemin="0" aria-valuemax="10">' +
+          '<div class="knob" id="sliderKnob">' + (lvl === null ? "" : lvl) + '</div></div>' +
+          '<div class="slider-ends"><span>Not at all</span><span>Fluent</span></div></div>' + nav();
+      },
+      bind: function () {
+        var range = $("#englishLevel"), sl = $("#slider");
+        function paint() {
+          var v = +range.value, pct = v / 10;
+          $("#sliderFill").style.width = "calc(" + pct + " * (100% - 28px) + 14px)";
+          $("#sliderKnob").style.left = "calc(" + pct + " * (100% - 28px))";
+          $("#sliderKnob").textContent = state.answers.englishLevel === null ? "" : v;
+          range.setAttribute("aria-valuenow", v);
+        }
+        range.addEventListener("input", function () {
+          state.answers.englishLevel = +range.value; sl.classList.remove("untouched"); clearInvalid("englishLevel"); paint(); save();
+        });
+        range.addEventListener("pointerdown", function () { sl.classList.add("active"); });
+        window.addEventListener("pointerup", function up() { sl.classList.remove("active"); });
+        paint();
+        $("#phone").addEventListener("input", function () {
+          var v = this.value, digits = v.replace(/\D/g, "").length;
+          setHint("phone", v && digits < 10 ? "Enter at least 10 digits" : "");
+        });
+      },
+      validate: function () {
+        var a = state.answers, ok = true, first = null;
+        function chk(id, cond, msg) { var r = fieldValid(id, cond, msg); if (!r) { ok = false; if (!first) first = id; } }
+        chk("name", a.name.trim().length > 0, "Required");
+        chk("phone", a.phone.replace(/\D/g, "").length >= 10, "Enter at least 10 digits");
+        chk("email", /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(a.email.trim()), a.email ? "That doesn\u2019t look like an email" : "Required");
+        chk("englishLevel", a.englishLevel !== null, "Move the slider");
+        if (!ok) focusField(first);
+        return ok;
+      }
+    },
+
+    { id: "stack", step: 4, title: "Your editing stack",
+      render: function () {
+        var other = state.answers.software.indexOf("Other") > -1;
+        return '<p class="q">Which editing software do you use? <span class="req">*</span></p>' +
+          '<div class="choices" data-group="software" id="stackList">' + stackListHTML() + '</div>' +
+          '<div class="reveal tight' + (other ? " open settled" : "") + '" id="otherReveal"><div>' +
+          '<div class="add-row" id="addRow"><input type="text" id="customInput" placeholder="Type it in" autocomplete="off" aria-label="Add another tool">' +
+          '<button type="button" class="btn-plus" data-act="add-custom" aria-label="Add">' + ICON.plus + '</button></div>' +
+          '</div></div>' + nav();
+      },
+      onChange: function (name, val) {
+        if (name === "software" && val === "Other") {
+          var open = state.answers.software.indexOf("Other") > -1;
+          toggleReveal($("#otherReveal"), open);
+          if (open) setTimeout(function () { var ci = $("#customInput"); if (ci && window.innerWidth > 768) ci.focus(); }, 60);
+        }
+      },
+      validate: function () {
+        var real = state.answers.software.filter(function (s) { return s !== "Other"; });
+        var ok = real.length > 0;
+        var list = $("#stackList");
+        list.classList.toggle("invalid", !ok);
+        if (!ok && state.answers.software.indexOf("Other") > -1) {
+          var row = $("#addRow"); flash(row); $("#customInput").focus();
+        }
+        return ok;
+      }
+    },
+
+    { id: "subs", step: 5, title: "Subtitles",
+      render: function () {
+        var yes = state.answers.automateSubs === "yes";
+        return '<p class="q">Do you automate your subtitles? <span class="req">*</span></p>' +
+          radioGroup("automateSubs", [{ value: "yes", label: "Yes" }, { value: "no", label: "No" }]) +
+          '<div class="reveal' + (yes ? " open settled" : "") + '" id="subsReveal"><div>' +
+          field({ id: "subsProcess", label: "Please describe every step you take to generate your subtitles and be as detailed as you can", required: true,
+            input: '<textarea id="subsProcess" name="subsProcess" placeholder="Step one...">' + esc(state.answers.subsProcess) + '</textarea>' }) +
+          '</div></div>' + nav();
+      },
+      onChange: function (name, val) {
+        if (name === "automateSubs") toggleReveal($("#subsReveal"), val === "yes");
+      },
+      validate: function () {
+        var a = state.answers;
+        if (!groupValid("automateSubs", a.automateSubs !== "")) return false;
+        if (a.automateSubs === "yes") { var ok = fieldValid("subsProcess", a.subsProcess.trim().length > 0, "Required"); if (!ok) focusField("subsProcess"); return ok; }
+        return true;
+      }
+    },
+
+    { id: "rate", step: 6, title: "Rate and delivery",
+      render: function () {
+        return field({ id: "pricePerReel", label: "Your price per reel (up to 45 seconds)", required: true,
+          input: '<div class="affix"><span class="pre">$</span>' + textInput("pricePerReel", "0", "number", 'min="0" step="1" inputmode="numeric"') + '<span class="suf">USD</span></div>' }) +
+          field({ id: "deliveryHours", label: "How many hours until you deliver the final file?", required: true,
+            input: textInput("deliveryHours", "12", "number", 'min="1" step="1" inputmode="numeric"') }) +
+          field({ id: "referral", label: "Do you have a referral code?",
+            helper: "If somebody sent you, put their code or their name here. Leave it empty if you found us on your own.",
+            input: textInput("referral", "Their code or their name", "text", 'autocomplete="off"') }) + nav();
+      },
+      validate: function () {
+        var a = state.answers, ok = true, first = null;
+        function chk(id, cond, msg) { var r = fieldValid(id, cond, msg); if (!r) { ok = false; if (!first) first = id; } }
+        chk("pricePerReel", a.pricePerReel !== "" && +a.pricePerReel >= 0, "Required");
+        chk("deliveryHours", a.deliveryHours !== "" && +a.deliveryHours > 0, "Required");
+        if (!ok) focusField(first);
+        return ok;
+      }
+    },
+
+    { id: "review", step: 7, title: "Review your answers",
+      render: function () {
+        var a = state.answers;
+        var lang = CONFIG.languages.filter(function (l) { return l.code === a.language; })[0];
+        var sections = [
+          { step: 1, title: "Start here", rows: [["Choose the language you will use in this application", lang ? lang.label : a.language]] },
+          { step: 2, title: "Your work", rows: [["Do you have one example of your work with motion graphics and captions?", a.hasExample === "yes" ? "Yes" : "No, I want to do a sample edit"]]
+            .concat(a.hasExample === "yes" ? [["Paste the link to the one example closest to the reference video", a.exampleLink]] : []) },
+          { step: 3, title: "About you", rows: [["Name", a.name], ["Phone number", a.phone], ["Email", a.email],
+            ["Telegram username", a.telegram || "Not given"], ["Discord username", a.discord || "Not given"],
+            ["How well do you understand spoken English?", a.englishLevel + " / 10"]] },
+          { step: 4, title: "Your editing stack", rows: [["Which editing software do you use?", a.software.filter(function (s) { return s !== "Other"; }).join(", ")]] },
+          { step: 5, title: "Subtitles", rows: [["Do you automate your subtitles?", a.automateSubs === "yes" ? "Yes" : "No"]]
+            .concat(a.automateSubs === "yes" ? [["How you generate your subtitles", a.subsProcess]] : []) },
+          { step: 6, title: "Rate and delivery", rows: [["Your price per reel (up to 45 seconds)", "$" + a.pricePerReel + " USD"],
+            ["How many hours until you deliver the final file?", a.deliveryHours], ["Do you have a referral code?", a.referral || "None"]] }
+        ];
+        var needTs = !!CONFIG.turnstileSiteKey;
+        return sections.map(function (s, i) {
+          return '<div class="rcard" style="--i:' + i + '"><div class="rhead"><span class="rt"><span class="dot">' + ICON.check + '</span>' + esc(s.title) + '</span>' +
+            '<button type="button" class="btn-edit" data-act="edit" data-step="' + s.step + '">' + ICON.pencil + 'Edit</button></div>' +
+            s.rows.map(function (r) { return '<div class="rrow"><p class="rq">' + esc(r[0]) + '</p><p class="ra">' + esc(r[1]) + '</p></div>'; }).join("") + '</div>';
+        }).join("") +
+          '<div class="ts' + (needTs ? "" : " hide") + '" id="ts"></div>' +
+          nav({ label: "Submit", cls: "submit", disabled: needTs && !state.token }) +
+          '<p class="err-msg" id="submitErr" role="alert"></p>';
+      },
+      bind: function () {
+        if (!CONFIG.turnstileSiteKey) return;
+        loadTurnstile(function () {
+          if (state.screen !== REVIEW || !window.turnstile) return;
+          var el = $("#ts"); if (!el || el.dataset.rendered) return;
+          el.dataset.rendered = "1";
+          window.turnstile.render(el, {
+            sitekey: CONFIG.turnstileSiteKey, theme: "dark",
+            callback: function (t) { state.token = t; var b = $('[data-act="next"]', stage); if (b) b.disabled = false; },
+            "expired-callback": function () { state.token = ""; var b = $('[data-act="next"]', stage); if (b) b.disabled = true; },
+            "error-callback": function () { state.token = ""; }
+          });
+        });
+      },
+      validate: function () { return true; }
+    }
+  ];
+
+  /* ---------- validation helpers ---------- */
+  function setHint(id, msg) {
+    var f = $('[data-field="' + id + '"]', stage); if (!f) return;
+    var h = $("[data-hint]", f); h.textContent = msg; h.classList.toggle("show", !!msg);
+  }
+  function fieldValid(id, cond, msg) {
+    var f = $('[data-field="' + id + '"]', stage); if (!f) return cond;
+    f.classList.toggle("invalid", !cond);
+    setHint(id, cond ? "" : msg);
+    return cond;
+  }
+  function clearInvalid(id) {
+    var f = $('[data-field="' + id + '"]', stage); if (!f) return;
+    if (f.classList.contains("invalid")) { f.classList.remove("invalid"); setHint(id, ""); }
+  }
+  function groupValid(name, cond) {
+    var g = $('[data-group="' + name + '"]', stage);
+    if (g) { g.classList.toggle("invalid", !cond); if (!cond) { var first = $(".choice", g); if (first) first.focus(); } }
+    return cond;
+  }
+  function focusField(id) {
+    var f = $('[data-field="' + id + '"]', stage); if (!f) return;
+    var el = $("input, textarea", f); if (el) el.focus({ preventScroll: false });
+  }
+  function flash(el) {
+    if (!el) return;
+    el.classList.remove("flash"); void el.offsetWidth; el.classList.add("flash");
+    setTimeout(function () { el.classList.remove("flash"); }, 500);
+  }
+  function toggleReveal(el, open) {
+    if (!el) return;
+    if (open) {
+      el.classList.add("open");
+      var done = function (e) { if (e.propertyName === "grid-template-rows") { el.classList.add("settled"); el.removeEventListener("transitionend", done); } };
+      if (motion) el.addEventListener("transitionend", done); else el.classList.add("settled");
+    } else {
+      el.classList.remove("open", "settled");
+    }
+  }
+
+  /* ---------- turnstile ---------- */
+  var tsQueue = [], tsLoading = false;
+  function loadTurnstile(cb) {
+    if (window.turnstile) { cb(); return; }
+    tsQueue.push(cb);
+    if (tsLoading) return;
+    tsLoading = true;
+    window.__sfeTurnstileReady = function () { var q = tsQueue.slice(); tsQueue = []; q.forEach(function (f) { f(); }); };
+    var s = document.createElement("script");
+    s.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?onload=__sfeTurnstileReady&render=explicit";
+    s.async = true; document.head.appendChild(s);
+  }
+
+  /* ---------- progress ---------- */
+  function renderProgress() {
+    var cur = SCREENS[state.screen].step, html = "";
+    for (var i = 1; i <= 7; i++) html += '<i class="' + (i < cur ? "done" : i === cur ? "current" : "") + '"></i>';
+    progress.innerHTML = html;
+  }
+
+  /* ---------- navigation ---------- */
+  function firstScreenOfStep(step) { for (var i = 0; i < SCREENS.length; i++) if (SCREENS[i].step === step) return i; return 0; }
+  function nextIndex(i) { var n = i + 1; if (i === 1 && state.answers.hasExample === "no") n = 4; return n; }
+  function prevIndex(i) { var p = i - 1; if (i === 4 && state.answers.hasExample === "no") p = 1; return p; }
+
+  function goTo(idx, dir) {
+    var s = SCREENS[idx];
+    function swap() {
+      var h0 = card.offsetHeight;
+      stage.className = "stage";
+      stage.innerHTML = s.render();
+      title.textContent = s.title;
+      title.classList.remove("t-out");
+      state.screen = idx; save(); renderProgress();
+      bindInputs();
+      if (s.bind) s.bind();
+      if (motion && dir !== 0) {
+        card.classList.add("animating");
+        card.style.height = h0 + "px";
+        var h1 = card.scrollHeight;
+        stage.classList.add(dir > 0 ? "in-fwd" : "in-back");
+        requestAnimationFrame(function () { requestAnimationFrame(function () { card.style.height = h1 + "px"; }); });
+        var onEnd = function (e) {
+          if (e.propertyName !== "height") return;
+          card.style.height = ""; card.classList.remove("animating"); card.removeEventListener("transitionend", onEnd);
+        };
+        card.addEventListener("transitionend", onEnd);
+        setTimeout(function () { card.style.height = ""; card.classList.remove("animating"); }, 600);
+      }
+      window.scrollTo({ top: 0, behavior: motion ? "smooth" : "auto" });
+      if (window.innerWidth > 768 && dir !== 0) {
+        var f = $("input[type='text'], input[type='email'], input[type='tel'], input[type='url'], input[type='number']", stage);
+        if (f && idx !== REVIEW) setTimeout(function () { f.focus({ preventScroll: true }); }, motion ? 380 : 0);
+      }
+    }
+    if (motion && dir !== 0) {
+      stage.classList.add(dir > 0 ? "out-fwd" : "out-back");
+      title.classList.add("t-out");
+      setTimeout(swap, 170);
+    } else swap();
+  }
+
+  function goNext() {
+    var s = SCREENS[state.screen];
+    if (s.validate && !s.validate()) return;
+    if (state.screen === REVIEW) { submit(); return; }
+    var n = nextIndex(state.screen);
+    if (state.editing) {
+      if (n >= REVIEW || SCREENS[n].step !== state.editing) { state.editing = 0; n = REVIEW; }
+    }
+    goTo(n, 1);
+  }
+  function goBack() {
+    if (state.screen === 0) return;
+    var p = prevIndex(state.screen);
+    if (state.editing && (SCREENS[p].step !== state.editing)) { state.editing = 0; p = REVIEW; }
+    goTo(p, -1);
+  }
+
+  /* ---------- input binding ---------- */
+  function bindInputs() {
+    $$("input, textarea", stage).forEach(function (el) {
+      if (el.type === "range" || !(el.name in state.answers)) return;
+      el.addEventListener("input", function () {
+        state.answers[el.name] = el.value; clearInvalid(el.name); save();
+      });
+    });
+  }
+
+  stage.addEventListener("click", function (e) {
+    var t = e.target.closest("[data-act], .choice");
+    if (!t) return;
+    var act = t.getAttribute("data-act");
+
+    if (t.classList.contains("choice")) {
+      var name = t.getAttribute("data-name"), val = t.getAttribute("data-value"), role = t.getAttribute("role");
+      var group = t.closest("[data-group]");
+      if (role === "radio") {
+        $$('.choice[data-name="' + name + '"]', stage).forEach(function (x) { x.setAttribute("aria-checked", "false"); });
+        t.setAttribute("aria-checked", "true");
+        state.answers[name] = val;
+      } else {
+        var on = t.getAttribute("aria-checked") !== "true";
+        t.setAttribute("aria-checked", on ? "true" : "false");
+        var arr = state.answers[name];
+        var i = arr.indexOf(val);
+        if (on && i < 0) arr.push(val);
+        if (!on && i > -1) arr.splice(i, 1);
+      }
+      if (group) group.classList.remove("invalid");
+      save();
+      var sc = SCREENS[state.screen];
+      if (sc.onChange) sc.onChange(name, val);
+      return;
+    }
+
+    if (act === "next") goNext();
+    else if (act === "back") goBack();
+    else if (act === "gate") {
+      if (!state.answers.understood) {
+        state.answers.understood = true; save();
+        t.classList.add("ok", "popped"); t.setAttribute("aria-pressed", "true");
+        setTimeout(function () { t.classList.remove("popped"); }, 320);
+      } else goNext();
+    }
+    else if (act === "add-custom") addCustom();
+    else if (act === "edit") {
+      state.editing = +t.getAttribute("data-step");
+      goTo(firstScreenOfStep(state.editing), -1);
+    }
+    else if (act === "play") {
+      var wrap = document.createElement("div"); wrap.className = "video";
+      wrap.innerHTML = '<iframe src="https://www.youtube-nocookie.com/embed/' + encodeURIComponent(CONFIG.youtubeVideoId) +
+        '?autoplay=1&rel=0" title="Reference video" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>';
+      t.replaceWith(wrap);
+    }
+  });
+
+  stage.addEventListener("keydown", function (e) {
+    if (e.key !== "Enter") return;
+    var t = e.target;
+    if (t.tagName !== "INPUT" || t.type === "range") return;
+    e.preventDefault();
+    if (t.id === "customInput") addCustom(); else goNext();
+  });
+
+  function addCustom() {
+    var input = $("#customInput"), row = $("#addRow"); if (!input) return;
+    var v = input.value.trim();
+    var all = CONFIG.software.concat(["Other"], state.answers.customSoftware).map(function (s) { return s.toLowerCase(); });
+    if (!v || all.indexOf(v.toLowerCase()) > -1) { flash(row); input.focus(); return; }
+    state.answers.customSoftware.push(v);
+    state.answers.software.push(v);
+    save();
+    var list = $("#stackList");
+    var h0 = list.offsetHeight;
+    list.innerHTML = stackListHTML(v);
+    list.classList.remove("invalid");
+    if (motion) { list.style.height = h0 + "px"; list.style.overflow = "hidden"; list.style.transition = "height .3s var(--ease)";
+      var h1 = list.scrollHeight; requestAnimationFrame(function () { list.style.height = h1 + "px"; });
+      setTimeout(function () { list.style.height = ""; list.style.overflow = ""; list.style.transition = ""; }, 320); }
+    input.value = ""; input.focus();
+  }
+
+  /* ---------- submit ---------- */
+  function payload() {
+    var a = state.answers;
+    return {
+      brand: CONFIG.brandName,
+      language: a.language,
+      has_example: a.hasExample,
+      example_link: a.hasExample === "yes" ? a.exampleLink : "",
+      name: a.name, phone: a.phone, email: a.email,
+      telegram: a.telegram, discord: a.discord,
+      english_level: a.englishLevel,
+      software: a.software.filter(function (s) { return s !== "Other"; }),
+      automate_subtitles: a.automateSubs,
+      subtitles_process: a.automateSubs === "yes" ? a.subsProcess : "",
+      price_per_reel_usd: a.pricePerReel,
+      delivery_hours: a.deliveryHours,
+      referral_code: a.referral,
+      cf_turnstile_response: state.token,
+      submitted_at: new Date().toISOString(),
+      page_url: location.href
+    };
+  }
+
+  function submit() {
+    var btn = $('[data-act="next"]', stage), lbl = $(".lbl", btn), err = $("#submitErr");
+    btn.disabled = true; lbl.textContent = "Sending..."; err.textContent = "";
+    var body = payload();
+    if (!CONFIG.submitEndpoint) {
+      console.log("No submitEndpoint set in CONFIG. This is what would have been sent:", body);
+      setTimeout(showSuccess, 700);
+      return;
+    }
+    fetch(CONFIG.submitEndpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Accept": "application/json" },
+      body: JSON.stringify(body)
+    }).then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      showSuccess();
+    }).catch(function () {
+      lbl.textContent = "Submit";
+      err.textContent = "That didn\u2019t go through. Try again, or email " + CONFIG.contactEmail + ".";
+      if (CONFIG.turnstileSiteKey && window.turnstile) {
+        state.token = ""; try { window.turnstile.reset($("#ts")); } catch (e) {}
+        btn.disabled = true;
+      } else btn.disabled = false;
+    });
+  }
+
+  function showSuccess() {
+    try { localStorage.removeItem(KEY); } catch (e) {}
+    progress.classList.add("hide");
+    title.classList.add("hide");
+    card.classList.add("success-card");
+    stage.className = "stage";
+    stage.innerHTML = '<div class="success"><div class="check">' + ICON.check + '</div><h2>Got it.</h2><p>' + esc(CONFIG.successNote) + '</p></div>';
+    if (motion) confetti();
+  }
+
+  /* ---------- confetti ---------- */
+  function confetti() {
+    var c = $("#confetti"), ctx = c.getContext("2d");
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    var W = window.innerWidth, H = window.innerHeight;
+    c.width = W * dpr; c.height = H * dpr; ctx.scale(dpr, dpr);
+    var colors = ["#ffde59", "#fff3b0", "#ffffff", "#e8c94a", "#fff8d6"];
+    var parts = [];
+    for (var i = 0; i < 180; i++) {
+      var left = i % 2 === 0;
+      parts.push({
+        x: left ? -10 : W + 10,
+        y: H * (0.25 + Math.random() * 0.4),
+        vx: (left ? 1 : -1) * (7 + Math.random() * 9),
+        vy: -(5 + Math.random() * 9),
+        w: 6 + Math.random() * 6, h: 4 + Math.random() * 6,
+        r: Math.random() * Math.PI, vr: (Math.random() - 0.5) * 0.3,
+        c: colors[Math.floor(Math.random() * colors.length)],
+        life: 1
+      });
+    }
+    var start = performance.now();
+    function frame(now) {
+      var t = (now - start) / 1000;
+      ctx.clearRect(0, 0, W, H);
+      parts.forEach(function (p) {
+        p.vx *= 0.975; p.vy = p.vy * 0.985 + 0.32;
+        p.x += p.vx; p.y += p.vy; p.r += p.vr;
+        p.life = Math.max(0, 1 - Math.max(0, t - 1.6) / 0.8);
+        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.r);
+        ctx.globalAlpha = p.life; ctx.fillStyle = p.c;
+        ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+        ctx.restore();
+      });
+      if (t < 2.5) requestAnimationFrame(frame); else ctx.clearRect(0, 0, W, H);
+    }
+    requestAnimationFrame(frame);
+  }
+
+  /* ---------- init ---------- */
+  load();
+  document.title = "Short Form Editor | " + CONFIG.brandName;
+  renderProgress();
+  goTo(state.screen, 0);
+})();
+</script>
+
+</body>
+</html>
